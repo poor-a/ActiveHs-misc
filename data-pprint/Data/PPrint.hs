@@ -6,7 +6,7 @@ module Data.PPrint
     ) where
 
 import Data.Data.GenRep.Functions (numberErrors)
-import Data.Data.GenRep.Doc (Doc, toDoc)
+import Data.Data.GenRep.Doc (Doc, valueToDoc)
 import Data.Data.Eval (eval)
 import Data.Data.Compare
 
@@ -32,7 +32,7 @@ pprintTo :: Data a => Int -> a -> IO Doc
 pprintTo max x = do
     x <- eval 1 max x
     let ([x'], es) = numberErrors [x]
-    return $ toDoc x' $+$ nest 2 (showBotts es)
+    return $ valueToDoc x' $+$ nest 2 (showBotts es)
 
 
 infix 0 === 
@@ -52,7 +52,7 @@ a === b = do
     (ans, a, b) <- compareData 0.8 0.2 700 a b
     let x = showAnswer ans
     let ([a', b'], es) = numberErrors [a, b]
-    return $ fsep [nest (length x + 1) (toDoc a'), text x <+> toDoc b']
+    return $ fsep [nest (length x + 1) (valueToDoc a'), text x <+> valueToDoc b']
          $+$ nest 2 (showBotts es)
 
 ----------------------

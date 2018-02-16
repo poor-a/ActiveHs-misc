@@ -124,10 +124,11 @@ constructor b x m = do
             $ fmap Right $ catchPureErrors x
     case y of
         Left x -> return x
-        Right (Left x) -> do 
-            fmap NestedError $ evalWithBudget b x
-        Right (Right x) -> do 
-            p <- decSizeBudget b (precedence x)
+        Right (Left exceptionMsg) ->
+            fmap NestedError $ evalWithBudget b exceptionMsg
+
+        Right (Right result) -> do
+            p <- decSizeBudget b (precedence result)
             fmap (Constructor p) m 
 
 evalWithBudget :: Data a => Budget -> a -> IO GenericData

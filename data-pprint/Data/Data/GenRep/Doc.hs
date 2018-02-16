@@ -2,15 +2,20 @@
 {-# LANGUAGE OverloadedStrings, PatternGuards #-}
 module Data.Data.GenRep.Doc
     ( Doc
-    , showLitCharInChar
-    , showLitCharInString
+    , Style(..)
+    , stringCharPlain
+    , stringCharAsLiterals
+    , showCharLit
+    , showCharLitInString
     , toDoc
+    , valueToDoc
+    , errorToDoc
     ) where
 
 import Data.Data.GenRep
-import Data.Char (ord, showLitChar)
+import Data.Char (isPrint, showLitChar)
 
-import Text.PrettyPrint.HughesPJ
+import Text.PrettyPrint.HughesPJ hiding (Style)
 import Data.List (intersperse)
 
 ----------------
@@ -21,39 +26,71 @@ import Data.List (intersperse)
 -------------------------
 
 -- |Show a character literal. Unicode characters are not escaped.
-showLitCharInChar :: Char -> String
-showLitCharInChar c | ord c >= 161 = [c]
-showLitCharInChar c = showLitChar c ""
+showCharLit :: Char -> String
+showCharLit c | isPrint c = [c]
+              | otherwise = showLitChar c ""
 
 -- |Show a character in a string literal. Unicode characters are not escaped.
-showLitCharInString :: Char -> String
-showLitCharInString '\''  = "'"
-showLitCharInString '"'   = "\\\""
-showLitCharInString c     = showLitCharInChar c 
+showCharLitInString :: Char -> String
+showCharLitInString '"'   = "\\\""
+showCharLitInString c     = showCharLit c
 
 ----------------------------------------------
 
--- |Convert 'GenericData' to 'Doc'.
-toDoc :: GenericData -> Doc
-toDoc {-text (<+>) fsep punctuate comma quotes doubleQuotes brackets parens -} 
-    = showsP 0 
+-- | Strings and Chars are shown as literals (with escapes and
+--   quotes), as in GHCi.
+stringCharAsLiterals :: Style
+stringCharAsLiterals = Style {
+    charLiterals   = True
+  , stringLiterals = True
+  }
+
+-- | Strings and Chars are shown without escapes and quotes. Useful for
+--   error messages, like the argument of 'error'.
+stringCharPlain :: Style
+stringCharPlain = Style {
+    charLiterals   = False
+  , stringLiterals = False
+  }
+
+-- | Controls how 'toDoc' behaves.
+data Style = Style {
+    charLiterals   :: Bool
+  , stringLiterals :: Bool
+  }
+
+errorToDoc :: GenericData -> Doc
+errorToDoc = toDoc stringCharPlain stringCharPlain
+
+valueToDoc :: GenericData -> Doc
+valueToDoc = toDoc stringCharAsLiterals stringCharPlain
+
+-- | Converts a 'GenericData' to a 'Doc'.
+toDoc :: Style -> Style -> GenericData -> Doc
+toDoc defaultStyle errorStyle val =
+  case val of
+    NestedError _ -> showsP errorStyle 0 val
+    _             -> showsP defaultStyle 0 val
   where
-    showsP j x = case x of
+    showsP :: Style -> Int -> GenericData -> Doc
+    showsP style j x = case x of
         Hole           -> text "…"       -- !!! ragadás
         ListHole       -> text "……"
         Timeout _      -> text "⊥"
-        NestedError e  -> text "⊥(" <+> toDoc e <+> text ")"
+        NestedError e  -> text "⊥:" <+> showsP errorStyle 0 e
         Error e        -> text e
-        Detail s       -> showParen_ (j > 10) $ text "……" <+> showsP 0 s <+> text "……"
-        Constructor (Char c) []         -> quotes $ text $ showLitCharInChar c
+        Detail s       -> showParen_ (j > 10) $ text "……" <+> showsP style 0 s <+> text "……"
+        Constructor (Char c) []         -> if charLiterals style
+                                           then quotes $ text $ showCharLit c
+                                           else char c
         Constructor Nil []              -> text "[]"
         Constructor (Prefix f) []       -> text f
-        Constructor (Infix i f)  [a,b]  -> showParen_ (j > i) $ showsP (i+1) a <+> text f <+> showsP (i+1) b
-        Constructor (Infixr i f) [a,b]  -> showParen_ (j > i) $ showsP (i+1) a <+> text f <+> showsP i b
-        Constructor (Infixl i f) [a,b]  -> showParen_ (j > i) $ showsP i a <+> text f <+> showsP (i+1) b
-        Constructor (Tuple _) xs        -> showParen_ True $ list $ map (showsP 0) xs
-        Constructor Cons [_,_]          -> fsep $ intersperse (text "++") $ elems x -- showListEnd "[]" "\"" "[" s
-        Constructor (Prefix f) l        -> showParen_ (j > 10) $ text f <+> fsep (map (showsP 11) l)
+        Constructor (Infix i f)  [a,b]  -> showParen_ (j > i) $ showsP style (i+1) a <+> text f <+> showsP style (i+1) b
+        Constructor (Infixr i f) [a,b]  -> showParen_ (j > i) $ showsP style (i+1) a <+> text f <+> showsP style i b
+        Constructor (Infixl i f) [a,b]  -> showParen_ (j > i) $ showsP style i a <+> text f <+> showsP style (i+1) b
+        Constructor (Tuple _) xs        -> showParen_ True $ list $ map (showsP style 0) xs
+        Constructor Cons [_,_]          -> fsep $ intersperse (text "++") $ elems style x -- showListEnd "[]" "\"" "[" s
+        Constructor (Prefix f) l        -> showParen_ (j > 10) $ text f <+> fsep (map (showsP style 11) l)
         _                               -> error $ "showsP: " ++ show x
 
     showParen_ True  = parens
@@ -61,11 +98,13 @@ toDoc {-text (<+>) fsep punctuate comma quotes doubleQuotes brackets parens -}
 
     list = fsep . punctuate comma
 
+    collectChars :: GenericData -> (String, GenericData)
     collectChars (Constructor Cons [Constructor (Char c) [],b])
         | (cs, x) <- collectChars b
         = (c: cs, x)
     collectChars x = ([], x)
 
+    collectElems :: GenericData -> ([GenericData], GenericData)
     collectElems x@(Constructor Cons [Constructor (Char _) [], _]) = ([], x)
     collectElems (Constructor Cons [a,b])
         | (cs, x) <- collectElems b
@@ -77,13 +116,16 @@ toDoc {-text (<+>) fsep punctuate comma quotes doubleQuotes brackets parens -}
         = ([ListHole], Constructor Nil [])
     collectElems x = ([], x)
 
-    elems x
-        | (es@(_:_), y) <- collectChars x
-        = doubleQuotes (text $ concatMap showLitCharInString es): elems y
-        | (es@(_:_), y) <- collectElems x
-        = (brackets . list . map (showsP 0) $ es): elems y
-    elems (Constructor Nil []) = []
-    elems (Detail x) = [text "...", showsP 0 x]
-    elems x = [showsP 0 x]
+    elems :: Style -> GenericData -> [Doc]
+    elems style x
+        | (cs@(_:_), rest) <- collectChars x =
+            if stringLiterals style
+            then doubleQuotes (text $ concatMap showCharLitInString cs): elems style rest
+            else text cs : elems style rest
+        | (es@(_:_), rest) <- collectElems x =
+            (brackets . list . map (showsP style 0) $ es): elems style rest
+    elems style (Constructor Nil []) = []
+    elems style (Detail x) = [text "...", showsP style 0 x]
+    elems style x = [showsP style 0 x]
 
 

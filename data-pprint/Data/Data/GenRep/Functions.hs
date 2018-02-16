@@ -6,7 +6,7 @@ module Data.Data.GenRep.Functions
     , getErrorIndex
     ) where
 
-import Data.Data.GenRep.Doc (toDoc)
+import Data.Data.GenRep.Doc (errorToDoc)
 import Data.Data.GenRep
 import System.SimpleTimeout.Limits (showTimeout)
 
@@ -57,7 +57,7 @@ numberErrors l
         return $ Error i
     replace (NestedError e) = do
         e' <- replace e
-        i <- getErrorIndex (show $ toDoc e')
+        i <- getErrorIndex (show $ errorToDoc e')
         return $ Error i
     replace (Timeout d) = do
         i <- getErrorIndex $ showTimeout d
