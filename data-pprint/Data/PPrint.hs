@@ -10,6 +10,7 @@ import Data.Data.GenRep.Doc (Doc, valueToDoc)
 import Data.Data.Eval (eval)
 import Data.Data.Compare
 
+import Prelude hiding ((<>))
 import Text.PrettyPrint.HughesPJ (fsep, nest, text, vcat, (<>), (<+>), ($+$))
 import Data.Data (Data)
 
