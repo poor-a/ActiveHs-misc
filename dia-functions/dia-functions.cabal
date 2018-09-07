@@ -28,12 +28,12 @@ library
     Graphics.Diagrams.SVG
 
   Build-Depends:
-    data-pprint >= 0.2 && < 0.3,
-    dia-base >= 0.1 && < 0.2,
-    base >= 4.0 && < 4.10,
-    containers >= 0.4 && < 0.6,
-    xhtml >= 3000.2 && < 3000.3,
-    mtl >= 2.0 && < 2.3,
-    deepseq >= 1.1 && < 1.5
+    data-pprint,
+    dia-base,
+    base,
+    containers,
+    xhtml,
+    mtl,
+    deepseq
 
 

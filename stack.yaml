@@ -1,0 +1,6 @@
+packages:
+  - activehs-base/
+  - data-pprint/
+  - dia-base/
+  - dia-functions/
+resolver: lts-10.2
