@@ -21,7 +21,4 @@ Library
   Exposed-Modules:
     ActiveHs.Base
   Build-Depends:
-    base,
-    QuickCheck
-
-
+    base

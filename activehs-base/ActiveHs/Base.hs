@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, ExistentialQuantification, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveDataTypeable, ExistentialQuantification #-}
 module ActiveHs.Base
     ( toDyn
     , Dynamic
@@ -6,17 +6,10 @@ module ActiveHs.Base
     , wrapData
     , WrapData2 (WrapData2)
     , Data
-
-    , TestCase (TestCase)
-
-    , QCInt  (QCInt)
-    , QCNat  (QCNat)
-    , QCBool (QCBool)
     ) where
 
 import Data.Dynamic (Dynamic, toDyn)
 import Data.Data (Data, Typeable)
-import Test.QuickCheck
 
 -------------------------
 
@@ -32,26 +25,3 @@ data WrapData2
 
 wrapData :: Data a => a -> WrapData
 wrapData = WrapData
-
-------------------------
-
-data TestCase 
-    = forall a prop . (Testable prop, Data a) 
-    => TestCase  (((String, a, a) -> Property) -> prop)
-        deriving (Typeable)
-
-newtype QCInt = QCInt Int
-    deriving (Show, Arbitrary)
-
-newtype QCBool = QCBool Bool
-    deriving (Show, Arbitrary)
-
-newtype QCNat = QCNat Int
-    deriving (Show)
-
-instance Arbitrary QCNat where
-    arbitrary 
-        = fmap (\(NonNegative n) -> QCNat n) arbitrary
-    shrink (QCNat n) 
-        = fmap (\(NonNegative m) -> QCNat m) $ shrink (NonNegative n)
-
